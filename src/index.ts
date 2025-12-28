@@ -13,19 +13,19 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// POST endpoint to trigger sync
-app.post('/sync', async (req: Request, res: Response) => {
+// Sync handler function
+const handleSync = async (req: Request, res: Response) => {
   try {
     // Validate configuration
     validateConfig();
 
-    // Get options from request body
-    const { type = 'full', useCache = true } = req.body;
+    // Get options from request body (POST) or query params (GET)
+    const { type = 'full', useCache = true } = req.method === 'POST' ? req.body : req.query;
 
-    console.log(`[${new Date().toISOString()}] Sync triggered via API - type: ${type}, useCache: ${useCache}`);
+    console.log(`[${new Date().toISOString()}] Sync triggered via ${req.method} - type: ${type}, useCache: ${useCache}`);
 
     // Create sync service
-    const syncService = new InventorySyncService(useCache);
+    const syncService = new InventorySyncService(useCache === 'true' || useCache === true);
 
     let result;
     switch (type) {
@@ -86,7 +86,11 @@ app.post('/sync', async (req: Request, res: Response) => {
       timestamp: new Date().toISOString()
     });
   }
-});
+};
+
+// GET and POST endpoints to trigger sync
+app.get('/sync', handleSync);
+app.post('/sync', handleSync);
 
 // Start server
 app.listen(PORT, () => {

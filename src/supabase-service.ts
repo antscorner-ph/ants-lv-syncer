@@ -18,7 +18,7 @@ export class SupabaseService {
    * Upsert products to Supabase
    */
   async upsertProducts(productsData: ProductWithInventory[]): Promise<number> {
-    const products: SupabaseProduct[] = productsData.map(({ variant, item, inventory, categoryName }) => {
+    const products: SupabaseProduct[] = productsData.map(({ variant, item, inventory, categoryName, imageUrl }) => {
       // Build product name with variant options if they exist
       let productName = item.item_name;
       const options: string[] = [];
@@ -41,7 +41,7 @@ export class SupabaseService {
         desc: item.description || null,
         price: variant.default_price,
         qty: Math.floor(totalQty),
-        image: null, // Loyverse API doesn't provide image URLs in basic endpoints
+        image: imageUrl || null,
       };
     });
 

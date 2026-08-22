@@ -97,4 +97,5 @@ export interface ProductWithInventory {
   item: LoyverseItem;
   inventory: LoyverseInventory;
   categoryName?: string;
+  imageUrl?: string | null;
 }

@@ -1,14 +1,69 @@
 import { LoyverseClient } from './loyverse-client';
 import { SupabaseService } from './supabase-service';
 import { SyncResult, ProductWithInventory } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
+
+interface SkuImageMapping {
+  sku: string;
+  image_filename: string;
+  has_image: boolean;
+  loyverse_match: {
+    item_id: string;
+    item_name: string;
+    variant_id: string;
+    sku: string;
+  } | null;
+}
 
 export class InventorySyncService {
   private loyverseClient: LoyverseClient;
   private supabaseService: SupabaseService;
+  private skuImageMap: Map<string, string>;
 
   constructor(useCache: boolean = true) {
     this.loyverseClient = new LoyverseClient(useCache);
     this.supabaseService = new SupabaseService(useCache);
+    this.skuImageMap = this.loadImageMapping();
+  }
+
+  /**
+   * Load SKU to image mapping from JSON file
+   */
+  private loadImageMapping(): Map<string, string> {
+    const mappingPath = path.join(__dirname, '../sku-image-mapping.json');
+    const map = new Map<string, string>();
+
+    try {
+      if (fs.existsSync(mappingPath)) {
+        const data = fs.readFileSync(mappingPath, 'utf8');
+        const mappings: SkuImageMapping[] = JSON.parse(data);
+        
+        mappings.forEach(mapping => {
+          if (mapping.has_image && mapping.loyverse_match) {
+            // Store the image URL path for antscorner-images
+            const imageUrl = `https://raw.githubusercontent.com/janzell/antscorner-images/refs/heads/main/${mapping.image_filename}`;
+            map.set(mapping.sku, imageUrl);
+          }
+        });
+        
+        console.log(`Loaded ${map.size} image mappings`);
+      } else {
+        console.warn(`Image mapping file not found at ${mappingPath}`);
+      }
+    } catch (error) {
+      console.error('Error loading image mapping:', error);
+    }
+
+    return map;
+  }
+
+  /**
+   * Get image URL for a SKU
+   */
+  private getImageUrl(sku: string | null): string | null {
+    if (!sku) return null;
+    return this.skuImageMap.get(sku) || null;
   }
 
   /**
@@ -74,6 +129,7 @@ export class InventorySyncService {
             item,
             inventory: inventory ? { ...inventory, in_stock: totalQty } : { variant_id: variant.variant_id, store_id: '', in_stock: totalQty },
             categoryName: item.category_id ? categoryMap.get(item.category_id) : undefined,
+            imageUrl: this.getImageUrl(variant.sku || null),
           };
         })
         .filter((p) => p !== null) as ProductWithInventory[];
@@ -238,6 +294,7 @@ export class InventorySyncService {
             item,
             inventory: inventory ? { ...inventory, in_stock: totalQty } : { variant_id: variant.variant_id, store_id: '', in_stock: totalQty },
             categoryName: item.category_id ? categoryMap.get(item.category_id) : undefined,
+            imageUrl: this.getImageUrl(variant.sku || null),
           };
         })
         .filter((p) => p !== null) as ProductWithInventory[];
